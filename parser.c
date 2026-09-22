@@ -6,69 +6,50 @@
 #define TEMP_MIN -40.0
 #define TEMP_MAX 85.0
 
-// Structure modeling raw satellite sensor data frames
 typedef struct {
     int packet_id;
     float latitude;
     float longitude;
-    float sensor_reading; // Raw ambient surface temperature stream
+    float sensor_reading;
 } TelemetryPacket;
 
-// Function to parse, validate, and isolate valid sensor entries
-void process_telemetry(TelemetryPacket data[], int size) {
-    printf("Initializing Telemetry Processing Engine Stream Analysis...\n");
-    printf("----------------------------------------------------------\n");
-    
+void process_and_export_telemetry(TelemetryPacket data[], int size, const char *output_filename) {
+    FILE *file = fopen(output_filename, "w");
+    if (file == NULL) {
+        printf("Error: Unable to create export file.\n");
+        return;
+    }
+
+    fprintf(file, "packet_id,latitude,longitude,sensor_reading\n");
     int valid_count = 0;
-    int corrupted_count = 0;
-    float rolling_sum = 0.0;
 
     for (int i = 0; i < size; i++) {
-        // Validation Layer 1: Filter out hardware transmission sentinel values (-9999.0)
-        if (data[i].sensor_reading == HARDWARE_SENTINEL) {
-            printf("[PACKET %03d ALERT] Hardware Failure Detected -- Sentinel Code Found -- Dropping Frame\n", data[i].packet_id);
-            corrupted_count++;
-            continue;
-        }
+        // Drop frames matching the aerospace hardware missing data flag
+        if (data[i].sensor_reading == HARDWARE_SENTINEL) continue;
 
-        // Validation Layer 2: Check against physical safe operating thresholds of electronic components
-        if (data[i].sensor_reading < TEMP_MIN || data[i].sensor_reading > TEMP_MAX) {
-            printf("[PACKET %03d ALERT] Boundary Violation: %.2f C -- Value Out of Bounds -- Dropping Frame\n", data[i].packet_id, data[i].sensor_reading);
-            corrupted_count++;
-            continue;
-        }
+        // Isolate thermal anomalies outside component data sheet limits
+        if (data[i].sensor_reading < TEMP_MIN || data[i].sensor_reading > TEMP_MAX) continue;
 
-        // Processing Layer: Handle clean data structures
-        rolling_sum += data[i].sensor_reading;
+        fprintf(file, "%d,%.2f,%.2f,%.2f\n", 
+                data[i].packet_id, data[i].latitude, data[i].longitude, data[i].sensor_reading);
+        
         valid_count++;
     }
 
-    // Output final analytical breakdown profile
-    printf("----------------------------------------------------------\n");
-    printf("Processing Cycle Complete.\n");
-    printf("Total Packets Analyzed: %d\n", size);
-    printf("Valid Frames Ingested:  %d\n", valid_count);
-    printf("Corrupted Frames Split: %d\n", corrupted_count);
-    
-    if (valid_count > 0) {
-        printf("Computed Stream Mean:   %.2f C\n", rolling_sum / valid_count);
-    } else {
-        printf("Warning: No valid data payloads remained after parser filtration.\n");
-    }
+    fclose(file);
+    printf("C Engine Complete: Exported %d clean packets to '%s'.\n", valid_count, output_filename);
 }
 
 int main() {
-    // Simulating a messy laboratory stream containing clean steps, extreme boundaries, and missing packets
     TelemetryPacket raw_stream[MAX_RECORDS] = {
-        {101, 12.97, 77.59, 24.5},    // Valid frame
-        {102, 12.98, 77.60, -9999.0}, // NASA/ISRO Missing Data Sentinel Value
-        {103, 12.99, 77.61, 26.1},    // Valid frame
-        {104, 13.00, 77.62, 115.0},   // Component Boundary Error (>85.0 C)
-        {105, 13.01, 77.63, 23.8},    // Valid frame
-        {106, 13.02, 77.64, -9999.0}  // NASA/ISRO Missing Data Sentinel Value
+        {101, 12.97, 77.59, 24.5},
+        {102, 12.98, 77.60, -9999.0}, 
+        {103, 12.99, 77.61, 26.1},
+        {104, 13.00, 77.62, 115.0},  
+        {105, 13.01, 77.63, 23.8},
+        {106, 13.02, 77.64, -9999.0}  
     };
 
-    process_telemetry(raw_stream, MAX_RECORDS);
-
+    process_and_export_telemetry(raw_stream, MAX_RECORDS, "clean_telemetry.csv");
     return 0;
 }
