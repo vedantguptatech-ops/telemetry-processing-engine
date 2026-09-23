@@ -1,33 +1,34 @@
 import os
 
-# Simulating the clean data output from our C parser engine
-clean_telemetry_payload = [
-    {"packet_id": 101, "lat": 12.97, "lon": 77.59, "reading": 24.5},
-    {"packet_id": 103, "lat": 12.99, "lon": 77.61, "reading": 26.1},
-    {"packet_id": 105, "lat": 13.01, "lon": 77.63, "reading": 23.8}
-]
-
-def log_telemetry_data(payload, filename="clean_telemetry.log"):
-    print("Starting Python Telemetry Ingestion Layer...")
-    print(f"Target destination log file: {filename}")
-    print("-" * 50)
+def parse_and_generate_sql(input_file="clean_telemetry.csv"):
+    print("Starting Python Dynamic Ingestion Layer...")
     
-    # Utilizing core Python file handling to write data structures
+    if not os.path.exists(input_file):
+        print(f"Error: Target file '{input_file}' not found. Run C engine first.")
+        return
+
     try:
-        with open(filename, "w") as file:
-            # Writing structured header columns for standard data engineering formats
-            file.write("PACKET_ID,LATITUDE,LONGITUDE,SENSOR_READING\n")
+        with open(input_file, "r") as file:
+            lines = file.readlines()
             
-            for packet in payload:
-                log_line = f"{packet['packet_id']},{packet['lat']},{packet['lon']},{packet['reading']}\n"
-                file.write(log_line)
-                print(f"Successfully ingested and written Packet ID: {packet['packet_id']}")
-                
-        print("-" * 50)
-        print("Data Ingestion Cycle Complete. Log file generated successfully.")
+        # Skip CSV column header row
+        data_lines = lines[1:]
+        
+        print(f"Detected {len(data_lines)} valid rows. Generating DML insertions:")
+        print("-" * 60)
+        
+        for line in data_lines:
+            row = line.strip().split(",")
+            packet_id, lat, lon, reading = row[0], row[1], row[2], row[3]
+            
+            sql_query = f"INSERT INTO satellite_telemetry (packet_id, latitude, longitude, sensor_reading) VALUES ({packet_id}, {lat}, {lon}, {reading});"
+            print(sql_query)
+            
+        print("-" * 60)
+        print("Data Ingestion Cycle Complete.")
         
     except IOError as e:
-        print(f"System Error: Unable to complete file operations. Detail: {e}")
+        print(f"System File Error: {e}")
 
 if __name__ == "__main__":
-    log_telemetry_data(clean_telemetry_payload)
+    parse_and_generate_sql()
