@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h> // Required for fabs()
 
 #define MAX_RECORDS 6
 #define HARDWARE_SENTINEL -9999.0
 #define TEMP_MIN -40.0
 #define TEMP_MAX 85.0
+#define EPSILON 0.001 // Safe threshold for float comparison
 
 typedef struct {
     int packet_id;
@@ -13,19 +15,20 @@ typedef struct {
     float sensor_reading;
 } TelemetryPacket;
 
-void process_and_export_telemetry(TelemetryPacket data[], int size, const char *output_filename) {
+// Changed return type to int to catch system failures
+int process_and_export_telemetry(TelemetryPacket data[], int size, const char *output_filename) {
     FILE *file = fopen(output_filename, "w");
     if (file == NULL) {
         printf("Error: Unable to create export file.\n");
-        return;
+        return 0; // Return failure status
     }
 
     fprintf(file, "packet_id,latitude,longitude,sensor_reading\n");
     int valid_count = 0;
 
     for (int i = 0; i < size; i++) {
-        // Drop frames matching the aerospace hardware missing data flag
-        if (data[i].sensor_reading == HARDWARE_SENTINEL) continue;
+        // FLOATING POINT FIX: Safe approximation matching for hardware flags
+        if (fabs(data[i].sensor_reading - HARDWARE_SENTINEL) < EPSILON) continue;
 
         // Isolate thermal anomalies outside component data sheet limits
         if (data[i].sensor_reading < TEMP_MIN || data[i].sensor_reading > TEMP_MAX) continue;
@@ -38,6 +41,7 @@ void process_and_export_telemetry(TelemetryPacket data[], int size, const char *
 
     fclose(file);
     printf("C Engine Complete: Exported %d clean packets to '%s'.\n", valid_count, output_filename);
+    return 1; // Return success status
 }
 
 int main() {
@@ -50,6 +54,10 @@ int main() {
         {106, 13.02, 77.64, -9999.0}  
     };
 
-    process_and_export_telemetry(raw_stream, MAX_RECORDS, "clean_telemetry.csv");
-    return 0;
+    // Route the return value to ensure system integrity
+    if (!process_and_export_telemetry(raw_stream, MAX_RECORDS, "clean_telemetry.csv")) {
+        return 1; // Exit engine with error state
+    }
+    
+    return 0; // Success
 }
