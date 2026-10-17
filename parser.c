@@ -33,13 +33,16 @@ int process_and_export_telemetry(TelemetryPacket data[], int size, const char *o
         // Isolate thermal anomalies outside component data sheet limits
         if (data[i].sensor_reading < TEMP_MIN || data[i].sensor_reading > TEMP_MAX) continue;
 
-        fprintf(file, "%d,%.2f,%.2f,%.2f\n", 
+        fprintf(file, "%d,%.6f,%.6f,%.2f\n", 
                 data[i].packet_id, data[i].latitude, data[i].longitude, data[i].sensor_reading);
         
         valid_count++;
     }
 
-    fclose(file);
+    if (fclose(file) == EOF) {
+    printf("Error: Failed to finish writing export file.\n");
+    return 0;
+}
     printf("C Engine Complete: Exported %d clean packets to '%s'.\n", valid_count, output_filename);
     return 1; // Return success status
 }
